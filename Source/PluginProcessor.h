@@ -30,15 +30,15 @@ struct Settings
 
     // Строка номера обращения
     bool   showInversion = false;
-    double invSize = 100.0;
-    double invX    = 25.0;         // % от ширины окна
-    double invY    = 78.0;         // % от высоты окна
+    double invSize = 120.0;
+    double invX    = 70.0;         // % от ширины окна
+    double invY    = 80.0;         // % от высоты окна
 
     // Строка ступени лада
     bool   showDegree = false;
-    double degSize = 100.0;
-    double degX    = 75.0;
-    double degY    = 78.0;
+    double degSize = 120.0;
+    double degX    = 30.0;
+    double degY    = 80.0;
 
     // Строка полиаккорда
     bool   showPoly = false;
@@ -83,8 +83,8 @@ public:
     Settings settings;
 
     // Размер окна плагина — сохраняется вместе с проектом
-    int lastEditorWidth  = 1800;
-    int lastEditorHeight = 1600;
+    int lastEditorWidth  = 800;
+    int lastEditorHeight = 800;
 
     // Ноты последнего зафиксированного аккорда (для редактора)
     std::vector<int> getHeldNotes() const;

@@ -37,6 +37,9 @@ SettingsPanel::SettingsPanel (ChordsDetectorProcessor& p) : processor (p)
         s.setColour (juce::Slider::thumbColourId, juce::Colours::white.withAlpha (0.85f));
         s.setColour (juce::Slider::textBoxTextColourId, colours::label);
         s.setColour (juce::Slider::textBoxOutlineColourId, colours::sectionEdge);
+        // Колесо мыши не должно менять значение ползунка — иначе прокрутка
+        // панели настроек застревает на первом же ползунке
+        s.setScrollWheelEnabled (false);
         s.onValueChange = [this] { changed(); };
         addAndMakeVisible (s);
     };
@@ -626,23 +629,42 @@ void ChordsDetectorEditor::paint (juce::Graphics& g)
     // ---- Основная строка (аккорд) ----
     if (chordText.isNotEmpty())
     {
-        float height = (float) (h * 0.45 * s.chordSize / 100.0);
-
         if (s.fitToWindow)
         {
-            // подбираем размер так, чтобы текст занял почти всю ширину окна
-            juce::Font probe (juce::FontOptions (typeface).withHeight (100.0f));
-            const float probeWidth =
-                juce::jmax (1.0f, juce::GlyphArrangement::getStringWidth (probe, chordText));
-            height = 100.0f * (w * 0.92f) / probeWidth;
-            height = juce::jmin (height, h * 0.7f);
-            height = (float) (height * s.chordSize / 100.0);
+            // Подбираем размер так, чтобы текст занял почти всю ширину окна.
+            // Считаем в несколько заходов: ширина текста не строго пропорциональна
+            // высоте шрифта, поэтому одного деления не хватает и хвост аккорда
+            // (например "3" в Cmaj13) может вылезти за край.
+            const float maxWidth = w * 0.92f;
+            float height = juce::jmin (h * 0.7f, maxWidth);
+
+            for (int i = 0; i < 8; ++i)
+            {
+                const juce::Font probe (juce::FontOptions (typeface).withHeight (height));
+                const float textWidth =
+                    juce::jmax (1.0f, juce::GlyphArrangement::getStringWidth (probe, chordText));
+
+                if (textWidth <= maxWidth)
+                    break;
+
+                height *= maxWidth / textWidth;
+            }
+
+            height = juce::jlimit (6.0f, h * 4.0f, (float) (height * s.chordSize / 100.0));
+
+            g.setFont (juce::Font (juce::FontOptions (typeface).withHeight (height)));
+            // drawFittedText дополнительно страхует: если текст всё же шире окна,
+            // он уменьшит шрифт вместо того, чтобы обрезать хвост
+            g.drawFittedText (chordText, getLocalBounds(), juce::Justification::centred, 1, 1.0f);
         }
+        else
+        {
+            const float height = juce::jlimit (6.0f, h * 4.0f,
+                                               (float) (h * 0.45 * s.chordSize / 100.0));
 
-        height = juce::jlimit (6.0f, h * 4.0f, height);
-
-        g.setFont (juce::Font (juce::FontOptions (typeface).withHeight (height)));
-        g.drawText (chordText, getLocalBounds(), juce::Justification::centred, false);
+            g.setFont (juce::Font (juce::FontOptions (typeface).withHeight (height)));
+            g.drawText (chordText, getLocalBounds(), juce::Justification::centred, false);
+        }
     }
 
     // ---- Дополнительные строки ----
