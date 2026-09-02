@@ -5,8 +5,9 @@
 namespace ids
 {
     #define ID(name) static const juce::Identifier name (#name);
-    ID (NotesToWebState)
-    ID (midiThru) ID (captureWindowMs)
+    ID (ChordsDetectorState)
+    ID (language) ID (midiThru) ID (captureWindowMs) ID (showSettings)
+    ID (backgroundColour) ID (textColour)
     ID (useFlat) ID (tonicPc) ID (modeKey)
     ID (chordSize) ID (fitToWindow)
     ID (showInversion) ID (invSize) ID (invX) ID (invY)
@@ -17,9 +18,13 @@ namespace ids
 
 juce::ValueTree Settings::toValueTree() const
 {
-    juce::ValueTree v (ids::NotesToWebState);
+    juce::ValueTree v (ids::ChordsDetectorState);
 
+    v.setProperty (ids::language,        language,        nullptr);
     v.setProperty (ids::midiThru,        midiThru,        nullptr);
+    v.setProperty (ids::showSettings,    showSettings,    nullptr);
+    v.setProperty (ids::backgroundColour, (int) backgroundColour, nullptr);
+    v.setProperty (ids::textColour,       (int) textColour,       nullptr);
     v.setProperty (ids::captureWindowMs, captureWindowMs, nullptr);
 
     juce::String flags;
@@ -55,7 +60,11 @@ void Settings::fromValueTree (const juce::ValueTree& v)
     if (! v.isValid())
         return;
 
+    language        = v.getProperty (ids::language,        language);
     midiThru        = v.getProperty (ids::midiThru,        midiThru);
+    showSettings    = v.getProperty (ids::showSettings,    showSettings);
+    backgroundColour = (juce::uint32) (int) v.getProperty (ids::backgroundColour, (int) backgroundColour);
+    textColour       = (juce::uint32) (int) v.getProperty (ids::textColour,       (int) textColour);
     captureWindowMs = v.getProperty (ids::captureWindowMs, captureWindowMs);
 
     const juce::String flags = v.getProperty (ids::useFlat, juce::String());
@@ -85,27 +94,27 @@ void Settings::fromValueTree (const juce::ValueTree& v)
 }
 
 //==============================================================================
-NotesToWebProcessor::NotesToWebProcessor()
+ChordsDetectorProcessor::ChordsDetectorProcessor()
     : AudioProcessor (BusesProperties()
                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 {
 }
 
-void NotesToWebProcessor::prepareToPlay (double sampleRate, int)
+void ChordsDetectorProcessor::prepareToPlay (double sampleRate, int)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     samplesUntilCommit = 0;
     captureFinished = true;
 }
 
-bool NotesToWebProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool ChordsDetectorProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto out = layouts.getMainOutputChannelSet();
     return out == juce::AudioChannelSet::stereo()
         || out == juce::AudioChannelSet::mono();
 }
 
-void NotesToWebProcessor::commitCapturedNotes()
+void ChordsDetectorProcessor::commitCapturedNotes()
 {
     const juce::ScopedLock sl (notesLock);
     heldNotes = capturedNotes;
@@ -115,7 +124,7 @@ void NotesToWebProcessor::commitCapturedNotes()
     updateCounter.fetch_add (1);
 }
 
-void NotesToWebProcessor::processBlock (juce::AudioBuffer<float>& buffer,
+void ChordsDetectorProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                         juce::MidiBuffer& midiMessages)
 {
     // Плагин ничего не озвучивает — выдаём тишину
@@ -164,23 +173,23 @@ void NotesToWebProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         midiMessages.clear();
 }
 
-std::vector<int> NotesToWebProcessor::getHeldNotes() const
+std::vector<int> ChordsDetectorProcessor::getHeldNotes() const
 {
     const juce::ScopedLock sl (notesLock);
     return heldNotes;
 }
 
 //==============================================================================
-juce::AudioProcessorEditor* NotesToWebProcessor::createEditor()
+juce::AudioProcessorEditor* ChordsDetectorProcessor::createEditor()
 {
-    return new NotesToWebEditor (*this);
+    return new ChordsDetectorEditor (*this);
 }
 
-void NotesToWebProcessor::getStateInformation (juce::MemoryBlock& destData)
+void ChordsDetectorProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = settings.toValueTree();
 
-    if (auto* ed = dynamic_cast<NotesToWebEditor*> (getActiveEditor()))
+    if (auto* ed = dynamic_cast<ChordsDetectorEditor*> (getActiveEditor()))
     {
         state.setProperty ("editorWidth",  ed->getWidth(),  nullptr);
         state.setProperty ("editorHeight", ed->getHeight(), nullptr);
@@ -195,7 +204,7 @@ void NotesToWebProcessor::getStateInformation (juce::MemoryBlock& destData)
         copyXmlToBinary (*xml, destData);
 }
 
-void NotesToWebProcessor::setStateInformation (const void* data, int sizeInBytes)
+void ChordsDetectorProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
     {
@@ -210,5 +219,5 @@ void NotesToWebProcessor::setStateInformation (const void* data, int sizeInBytes
 //==============================================================================
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new NotesToWebProcessor();
+    return new ChordsDetectorProcessor();
 }

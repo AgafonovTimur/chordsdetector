@@ -5,11 +5,18 @@
 
 //==============================================================================
 //  Настройки плагина. Сохраняются вместе с проектом DAW.
+//  Значения по умолчанию, заданные здесь, восстанавливает кнопка
+//  "По умолчанию" в самом низу панели настроек.
 //==============================================================================
 struct Settings
 {
+    int  language        = 0;      // 0 - русский, 1 - английский, 2 - китайский
     bool midiThru        = true;   // пропускать MIDI дальше по цепочке
     int  captureWindowMs = 50;     // окно захвата аккорда
+    bool showSettings    = false;  // была ли открыта панель настроек
+
+    juce::uint32 backgroundColour = 0xff1a1a1a;
+    juce::uint32 textColour       = 0xff8e8e8e;
 
     bool useFlat[12] = { false, true, false, true, false,
                          false, true, false, true, false, true, false };
@@ -43,11 +50,11 @@ struct Settings
 };
 
 //==============================================================================
-class NotesToWebProcessor : public juce::AudioProcessor
+class ChordsDetectorProcessor : public juce::AudioProcessor
 {
 public:
-    NotesToWebProcessor();
-    ~NotesToWebProcessor() override = default;
+    ChordsDetectorProcessor();
+    ~ChordsDetectorProcessor() override = default;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -76,8 +83,8 @@ public:
     Settings settings;
 
     // Размер окна плагина — сохраняется вместе с проектом
-    int lastEditorWidth  = 900;
-    int lastEditorHeight = 400;
+    int lastEditorWidth  = 1800;
+    int lastEditorHeight = 1600;
 
     // Ноты последнего зафиксированного аккорда (для редактора)
     std::vector<int> getHeldNotes() const;
@@ -101,5 +108,5 @@ private:
     std::atomic<int>  updateCounter { 0 };
     std::atomic<bool> playedAnyNote { false };
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NotesToWebProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChordsDetectorProcessor)
 };

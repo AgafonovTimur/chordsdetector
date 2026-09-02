@@ -2,14 +2,17 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "PluginProcessor.h"
+#include "Lang.h"
 
 //==============================================================================
 //  Панель настроек. Прокручивается, если окно плагина маленькое.
 //==============================================================================
-class SettingsPanel : public juce::Component
+class SettingsPanel : public juce::Component,
+                      private juce::ChangeListener
 {
 public:
-    explicit SettingsPanel (NotesToWebProcessor& p);
+    explicit SettingsPanel (ChordsDetectorProcessor& p);
+    ~SettingsPanel() override = default;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -17,37 +20,49 @@ public:
     std::function<void()> onSettingsChanged;
 
     void refreshFromSettings();
+    void updateTexts();
     int  getRequiredHeight() const { return requiredHeight; }
 
 private:
     void changed();
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;
+    void openColourPicker (int target, juce::Component& anchor);
+    void styleTextButton (juce::TextButton& b, bool on);
 
-    NotesToWebProcessor& processor;
+    ChordsDetectorProcessor& processor;
 
-    juce::ToggleButton midiThruToggle { "Пропускать MIDI дальше (MIDI Thru)" };
+    juce::OwnedArray<juce::TextButton> languageButtons;
+
+    juce::ToggleButton midiThruToggle;
 
     juce::Label  captureLabel;
     juce::Slider captureSlider;
 
     juce::Label  chordSizeLabel;
     juce::Slider chordSizeSlider;
-    juce::ToggleButton fitToWindowToggle { "Подгонять аккорд под ширину окна" };
+    juce::ToggleButton fitToWindowToggle;
+
+    juce::Label      bgColourLabel, textColourLabel;
+    juce::TextButton bgColourButton, textColourButton;
+    int activeColourTarget = -1;   // 0 — фон, 1 — текст
 
     juce::OwnedArray<juce::ToggleButton> accidentalToggles;
     juce::OwnedArray<juce::TextButton>   tonicButtons;
     juce::OwnedArray<juce::TextButton>   modeButtons;
 
-    juce::ToggleButton showInversionToggle { "Показывать номер обращения" };
+    juce::ToggleButton showInversionToggle;
     juce::Slider invSizeSlider, invXSlider, invYSlider;
     juce::Label  invSizeLabel, invXLabel, invYLabel;
 
-    juce::ToggleButton showDegreeToggle { "Показывать ступень лада" };
+    juce::ToggleButton showDegreeToggle;
     juce::Slider degSizeSlider, degXSlider, degYSlider;
     juce::Label  degSizeLabel, degXLabel, degYLabel;
 
-    juce::ToggleButton showPolyToggle { "Показывать полиаккорд, если аккорд не определился" };
+    juce::ToggleButton showPolyToggle;
     juce::Slider polyXSlider, polyYSlider;
     juce::Label  polyXLabel, polyYLabel;
+
+    juce::TextButton resetButton;
 
     // Заголовки секций рисуются напрямую, без отдельных компонентов
     juce::Array<std::pair<juce::Rectangle<int>, juce::String>> titles;
@@ -60,12 +75,12 @@ private:
 };
 
 //==============================================================================
-class NotesToWebEditor : public juce::AudioProcessorEditor,
-                         private juce::Timer
+class ChordsDetectorEditor : public juce::AudioProcessorEditor,
+                             private juce::Timer
 {
 public:
-    explicit NotesToWebEditor (NotesToWebProcessor&);
-    ~NotesToWebEditor() override;
+    explicit ChordsDetectorEditor (ChordsDetectorProcessor&);
+    ~ChordsDetectorEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -73,23 +88,30 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
+    void refreshEverything();
+
 private:
     void timerCallback() override;
     void recalculate();
     void toggleSettings();
 
-    NotesToWebProcessor& processor;
+    ChordsDetectorProcessor& processor;
 
     juce::Typeface::Ptr typeface;
 
     juce::Viewport      settingsViewport;
     SettingsPanel       settingsPanel;
-    juce::TextButton    settingsButton { "Настройки" };
+    juce::TextButton    settingsButton;
 
     // Текущее содержимое строк
     juce::String chordText, inversionText, degreeText, polyText;
+    bool chordTextIsPlaceholder = false;
 
     int lastUpdateCounter = -1;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NotesToWebEditor)
+    // Пока окно не построено до конца, его размер в настройки не записывается:
+    // иначе ограничения размера успевают затереть сохранённое значение
+    bool ready = false;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChordsDetectorEditor)
 };

@@ -29,7 +29,7 @@ namespace ChordEngine
     struct Quality
     {
         bool upperCase;             // true — заглавная римская цифра (мажорная основа)
-        juce::String symbol;        // "", "+" или "°"
+        juce::String symbol;        // "", "+" or the degree sign
     };
 
     // ====== ШАБЛОНЫ АККОРДОВ (правьте здесь, если надо добавить аккорд) ======
@@ -153,10 +153,10 @@ namespace ChordEngine
     { "7", { true, "" } },
     { "maj7", { true, "" } },
     { "m7", { false, "" } },
-    { "m7(b5)", { false, "°" } },
-    { "dim7", { false, "°" } },
+    { "m7(b5)", { false, juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) } },
+    { "dim7", { false, juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) } },
     { "m(maj7)", { false, "" } },
-    { "dim(maj7)", { false, "°" } },
+    { "dim(maj7)", { false, juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) } },
     { "maj7(#5)", { true, "+" } },
     { "7(#5)", { true, "+" } },
     { "7(b5)", { true, "" } },
@@ -177,7 +177,7 @@ namespace ChordEngine
     { "7(#9)(no5)", { true, "" } },
     { "", { true, "" } },
     { "m", { false, "" } },
-    { "dim", { false, "°" } },
+    { "dim", { false, juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) } },
     { "aug", { true, "+" } },
     { "sus2", { true, "" } },
     { "sus4", { true, "" } },
@@ -194,20 +194,21 @@ namespace ChordEngine
     }
 
     // ====== ЛАДЫ ======
-    struct Mode { const char* key; const char* label; std::vector<int> intervals; };
+    // Читаемые названия ладов лежат в Lang.h — здесь только ключ и интервалы
+    struct Mode { const char* key; std::vector<int> intervals; };
 
     inline const std::vector<Mode>& modes()
     {
         static const std::vector<Mode> m = {
-            { "major",    "Мажор",          { 0, 2, 4, 5, 7, 9, 11 } },
-            { "natmin",   "Натур. минор",   { 0, 2, 3, 5, 7, 8, 10 } },
-            { "harmin",   "Гарм. минор",    { 0, 2, 3, 5, 7, 8, 11 } },
-            { "melmin",   "Мелод. минор",   { 0, 2, 3, 5, 7, 9, 11 } },
-            { "dorian",   "Дорийский",      { 0, 2, 3, 5, 7, 9, 10 } },
-            { "phrygian", "Фригийский",     { 0, 1, 3, 5, 7, 8, 10 } },
-            { "lydian",   "Лидийский",      { 0, 2, 4, 6, 7, 9, 11 } },
-            { "mixo",     "Миксолидийский", { 0, 2, 4, 5, 7, 9, 10 } },
-            { "locrian",  "Локрийский",     { 0, 1, 3, 5, 6, 8, 10 } },
+            { "major",    { 0, 2, 4, 5, 7, 9, 11 } },
+            { "natmin",   { 0, 2, 3, 5, 7, 8, 10 } },
+            { "harmin",   { 0, 2, 3, 5, 7, 8, 11 } },
+            { "melmin",   { 0, 2, 3, 5, 7, 9, 11 } },
+            { "dorian",   { 0, 2, 3, 5, 7, 9, 10 } },
+            { "phrygian", { 0, 1, 3, 5, 7, 8, 10 } },
+            { "lydian",   { 0, 2, 4, 6, 7, 9, 11 } },
+            { "mixo",     { 0, 2, 4, 5, 7, 9, 10 } },
+            { "locrian",  { 0, 1, 3, 5, 6, 8, 10 } },
         };
         return m;
     }

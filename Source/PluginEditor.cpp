@@ -4,8 +4,6 @@
 //==============================================================================
 namespace colours
 {
-    static const juce::Colour background   { 0xff1a1a1a };
-    static const juce::Colour text         { 0xff8e8e8e };
     static const juce::Colour panel        { 0xff141414 };
     static const juce::Colour section      { 0xff1a1a1a };
     static const juce::Colour sectionEdge  { 0xff2a2a2a };
@@ -13,13 +11,21 @@ namespace colours
     static const juce::Colour dimLabel     { 0xff999999 };
     static const juce::Colour buttonOff    { 0xff1f1f1f };
     static const juce::Colour buttonOn     { 0xff6b6b6b };
+    static const juce::Colour scrollThumb  { 0xff5a5a5a };
 }
 
 static const char* TONIC_NAMES[12] =
     { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
 
 //==============================================================================
-SettingsPanel::SettingsPanel (NotesToWebProcessor& p) : processor (p)
+void SettingsPanel::styleTextButton (juce::TextButton& b, bool on)
+{
+    b.setColour (juce::TextButton::buttonColourId, on ? colours::buttonOn : colours::buttonOff);
+    b.setColour (juce::TextButton::textColourOffId, on ? juce::Colours::white : colours::label);
+    b.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+}
+
+SettingsPanel::SettingsPanel (ChordsDetectorProcessor& p) : processor (p)
 {
     auto styleSlider = [this] (juce::Slider& s, double lo, double hi, double step)
     {
@@ -60,26 +66,38 @@ SettingsPanel::SettingsPanel (NotesToWebProcessor& p) : processor (p)
     styleSlider (polyXSlider,      0.0, 100.0, 1.0);
     styleSlider (polyYSlider,      0.0, 100.0, 1.0);
 
-    auto setupLabel = [this] (juce::Label& l, const juce::String& text)
+    for (auto* l : { &captureLabel, &chordSizeLabel, &invSizeLabel, &invXLabel, &invYLabel,
+                     &degSizeLabel, &degXLabel, &degYLabel, &polyXLabel, &polyYLabel,
+                     &bgColourLabel, &textColourLabel })
     {
-        l.setText (text, juce::dontSendNotification);
-        l.setColour (juce::Label::textColourId, colours::dimLabel);
-        l.setFont (juce::Font (juce::FontOptions (14.0f)));
-        addAndMakeVisible (l);
-    };
+        l->setColour (juce::Label::textColourId, colours::dimLabel);
+        l->setFont (juce::Font (juce::FontOptions (14.0f)));
+        addAndMakeVisible (*l);
+    }
 
-    setupLabel (captureLabel,   "Окно захвата аккорда, мс");
-    setupLabel (chordSizeLabel, "Размер аккорда, %");
-    setupLabel (invSizeLabel,   "Размер, %");
-    setupLabel (invXLabel,      "Позиция по горизонтали, %");
-    setupLabel (invYLabel,      "Позиция по вертикали, %");
-    setupLabel (degSizeLabel,   "Размер, %");
-    setupLabel (degXLabel,      "Позиция по горизонтали, %");
-    setupLabel (degYLabel,      "Позиция по вертикали, %");
-    setupLabel (polyXLabel,     "Позиция по горизонтали, %");
-    setupLabel (polyYLabel,     "Позиция по вертикали, %");
+    // ---- Выбор языка ----
+    for (int i = 0; i < 3; ++i)
+    {
+        auto* b = new juce::TextButton();
+        b->onClick = [this, i]
+        {
+            processor.settings.language = i;
+            updateTexts();
+            refreshFromSettings();
+            resized();
+            changed();
+        };
+        addAndMakeVisible (b);
+        languageButtons.add (b);
+    }
 
-    // Бемоль вместо диеза — отдельно по каждой ноте
+    // ---- Цвета ----
+    bgColourButton.onClick   = [this] { openColourPicker (0, bgColourButton); };
+    textColourButton.onClick = [this] { openColourPicker (1, textColourButton); };
+    addAndMakeVisible (bgColourButton);
+    addAndMakeVisible (textColourButton);
+
+    // ---- Бемоль вместо диеза — отдельно по каждой ноте ----
     for (int idx : ChordEngine::ACCIDENTAL_INDICES)
     {
         auto* b = new juce::ToggleButton (juce::String (ChordEngine::NOTE_NAMES_SHARP[idx])
@@ -91,11 +109,10 @@ SettingsPanel::SettingsPanel (NotesToWebProcessor& p) : processor (p)
         accidentalToggles.add (b);
     }
 
-    // Тоники
+    // ---- Тоники ----
     for (int i = 0; i < 12; ++i)
     {
         auto* b = new juce::TextButton (TONIC_NAMES[i]);
-        b->setClickingTogglesState (false);
         b->onClick = [this, i]
         {
             processor.settings.tonicPc = (processor.settings.tonicPc == i) ? -1 : i;
@@ -106,12 +123,11 @@ SettingsPanel::SettingsPanel (NotesToWebProcessor& p) : processor (p)
         tonicButtons.add (b);
     }
 
-    // Лады
+    // ---- Лады ----
     for (auto& m : ChordEngine::modes())
     {
         const juce::String key (m.key);
-        auto* b = new juce::TextButton (m.label);
-        b->setClickingTogglesState (false);
+        auto* b = new juce::TextButton();
         b->onClick = [this, key]
         {
             processor.settings.modeKey = (processor.settings.modeKey == key) ? juce::String() : key;
@@ -122,7 +138,95 @@ SettingsPanel::SettingsPanel (NotesToWebProcessor& p) : processor (p)
         modeButtons.add (b);
     }
 
+    // ---- Сброс настроек ----
+    resetButton.onClick = [this]
+    {
+        const int keepLanguage = processor.settings.language;
+        processor.settings = Settings();
+        processor.settings.language = keepLanguage;
+        updateTexts();
+        refreshFromSettings();
+        resized();
+        changed();
+    };
+    addAndMakeVisible (resetButton);
+
+    updateTexts();
     refreshFromSettings();
+}
+
+//==============================================================================
+void SettingsPanel::openColourPicker (int target, juce::Component& anchor)
+{
+    activeColourTarget = target;
+
+    auto selector = std::make_unique<juce::ColourSelector> (
+        juce::ColourSelector::showColourAtTop
+        | juce::ColourSelector::showSliders
+        | juce::ColourSelector::showColourspace);
+
+    selector->setCurrentColour (juce::Colour (target == 0 ? processor.settings.backgroundColour
+                                                          : processor.settings.textColour));
+    selector->setSize (280, 320);
+    selector->addChangeListener (this);
+
+    juce::CallOutBox::launchAsynchronously (std::move (selector),
+                                            anchor.getScreenBounds(),
+                                            nullptr);
+}
+
+void SettingsPanel::changeListenerCallback (juce::ChangeBroadcaster* source)
+{
+    if (auto* cs = dynamic_cast<juce::ColourSelector*> (source))
+    {
+        const auto argb = cs->getCurrentColour().getARGB();
+
+        if (activeColourTarget == 0)
+            processor.settings.backgroundColour = argb;
+        else if (activeColourTarget == 1)
+            processor.settings.textColour = argb;
+
+        refreshFromSettings();
+
+        if (onSettingsChanged)
+            onSettingsChanged();
+    }
+}
+
+//==============================================================================
+void SettingsPanel::updateTexts()
+{
+    const int l = processor.settings.language;
+
+    for (int i = 0; i < languageButtons.size(); ++i)
+        languageButtons[i]->setButtonText (Lang::languageName (i));
+
+    midiThruToggle.setButtonText     (Lang::midiThru (l));
+    fitToWindowToggle.setButtonText  (Lang::fitToWindow (l));
+    showInversionToggle.setButtonText(Lang::showInversion (l));
+    showDegreeToggle.setButtonText   (Lang::showDegree (l));
+    showPolyToggle.setButtonText     (Lang::showPoly (l));
+
+    captureLabel.setText    (Lang::captureWindow (l), juce::dontSendNotification);
+    chordSizeLabel.setText  (Lang::chordSize (l),     juce::dontSendNotification);
+    bgColourLabel.setText   (Lang::bgColour (l),      juce::dontSendNotification);
+    textColourLabel.setText (Lang::textColour (l),    juce::dontSendNotification);
+
+    invSizeLabel.setText (Lang::size (l), juce::dontSendNotification);
+    invXLabel.setText    (Lang::posX (l), juce::dontSendNotification);
+    invYLabel.setText    (Lang::posY (l), juce::dontSendNotification);
+    degSizeLabel.setText (Lang::size (l), juce::dontSendNotification);
+    degXLabel.setText    (Lang::posX (l), juce::dontSendNotification);
+    degYLabel.setText    (Lang::posY (l), juce::dontSendNotification);
+    polyXLabel.setText   (Lang::posX (l), juce::dontSendNotification);
+    polyYLabel.setText   (Lang::posY (l), juce::dontSendNotification);
+
+    bgColourButton.setButtonText   (Lang::pickColour (l));
+    textColourButton.setButtonText (Lang::pickColour (l));
+    resetButton.setButtonText      (Lang::resetDefaults (l));
+
+    for (int i = 0; i < modeButtons.size(); ++i)
+        modeButtons[i]->setButtonText (Lang::modeName (l, ChordEngine::modes()[(size_t) i].key));
 }
 
 void SettingsPanel::changed()
@@ -188,23 +292,24 @@ void SettingsPanel::refreshFromSettings()
     polyXSlider.setValue (s.polyX, juce::dontSendNotification);
     polyYSlider.setValue (s.polyY, juce::dontSendNotification);
 
+    for (int i = 0; i < languageButtons.size(); ++i)
+        styleTextButton (*languageButtons[i], s.language == i);
+
     for (int i = 0; i < tonicButtons.size(); ++i)
-    {
-        const bool on = (s.tonicPc == i);
-        tonicButtons[i]->setColour (juce::TextButton::buttonColourId,
-                                    on ? colours::buttonOn : colours::buttonOff);
-        tonicButtons[i]->setColour (juce::TextButton::textColourOffId,
-                                    on ? juce::Colours::white : colours::label);
-    }
+        styleTextButton (*tonicButtons[i], s.tonicPc == i);
 
     for (int i = 0; i < modeButtons.size(); ++i)
-    {
-        const bool on = (s.modeKey == ChordEngine::modes()[(size_t) i].key);
-        modeButtons[i]->setColour (juce::TextButton::buttonColourId,
-                                   on ? colours::buttonOn : colours::buttonOff);
-        modeButtons[i]->setColour (juce::TextButton::textColourOffId,
-                                   on ? juce::Colours::white : colours::label);
-    }
+        styleTextButton (*modeButtons[i], s.modeKey == ChordEngine::modes()[(size_t) i].key);
+
+    // Кнопки-образцы показывают текущий цвет
+    const juce::Colour bg (s.backgroundColour);
+    const juce::Colour tx (s.textColour);
+    bgColourButton.setColour (juce::TextButton::buttonColourId, bg);
+    bgColourButton.setColour (juce::TextButton::textColourOffId, bg.contrasting (0.7f));
+    textColourButton.setColour (juce::TextButton::buttonColourId, tx);
+    textColourButton.setColour (juce::TextButton::textColourOffId, tx.contrasting (0.7f));
+
+    styleTextButton (resetButton, false);
 
     updating = false;
     repaint();
@@ -214,7 +319,6 @@ void SettingsPanel::paint (juce::Graphics& g)
 {
     g.fillAll (colours::panel);
 
-    g.setColour (colours::section);
     for (auto& r : sectionBounds)
     {
         g.setColour (colours::section);
@@ -226,12 +330,14 @@ void SettingsPanel::paint (juce::Graphics& g)
     g.setColour (colours::dimLabel);
     g.setFont (juce::Font (juce::FontOptions (12.0f)));
 
-    for (auto& l : titles)
-        g.drawText (l.second, l.first, juce::Justification::centredLeft);
+    for (auto& t : titles)
+        g.drawText (t.second, t.first, juce::Justification::centredLeft);
 }
 
 void SettingsPanel::resized()
 {
+    const int l = processor.settings.language;
+
     sectionBounds.clear();
     titles.clear();
 
@@ -240,7 +346,7 @@ void SettingsPanel::resized()
     const int gap = 8;
     int y = pad;
     const int w = juce::jmax (320, getWidth() - pad * 2);
-    const int labelW = juce::jmin (220, w / 2);
+    const int labelW = juce::jmin (250, w / 2);
 
     auto sectionStart = [&] { return y; };
     auto closeSection = [&] (int startY)
@@ -251,42 +357,64 @@ void SettingsPanel::resized()
 
     auto addTitle = [&] (const juce::String& text)
     {
-        titles.add ({ { pad, y, w, 16 }, text.toUpperCase() });
+        titles.add ({ { pad, y, w, 16 }, text });
         y += 22;
     };
 
-    auto addSliderRow = [&] (juce::Label& l, juce::Slider& s)
+    auto addSliderRow = [&] (juce::Label& lb, juce::Slider& s)
     {
-        l.setBounds (pad, y, labelW, rowH);
+        lb.setBounds (pad, y, labelW, rowH);
         s.setBounds (pad + labelW, y, w - labelW, rowH);
         y += rowH + gap;
     };
 
-    // ---- Общее ----
+    // ---- Язык ----
     int st = sectionStart();
-    addTitle ("Общее");
+    addTitle (Lang::secLanguage (l));
+    {
+        const int bw = (w - 8) / 3;
+        int x = pad;
+        for (auto* b : languageButtons) { b->setBounds (x, y, bw - 4, rowH); x += bw; }
+        y += rowH + gap;
+    }
+    closeSection (st);
+
+    // ---- Общее ----
+    st = sectionStart();
+    addTitle (Lang::secGeneral (l));
     midiThruToggle.setBounds (pad, y, w, rowH); y += rowH + gap;
     addSliderRow (captureLabel, captureSlider);
     closeSection (st);
 
     // ---- Строка аккорда ----
     st = sectionStart();
-    addTitle ("Строка аккорда");
+    addTitle (Lang::secChordLine (l));
     fitToWindowToggle.setBounds (pad, y, w, rowH); y += rowH + gap;
     addSliderRow (chordSizeLabel, chordSizeSlider);
     closeSection (st);
 
+    // ---- Цвета ----
+    st = sectionStart();
+    addTitle (Lang::secColours (l));
+    bgColourLabel.setBounds (pad, y, labelW, rowH);
+    bgColourButton.setBounds (pad + labelW, y, w - labelW, rowH);
+    y += rowH + gap;
+    textColourLabel.setBounds (pad, y, labelW, rowH);
+    textColourButton.setBounds (pad + labelW, y, w - labelW, rowH);
+    y += rowH + gap;
+    closeSection (st);
+
     // ---- Бемоли ----
     st = sectionStart();
-    addTitle ("Бемоль вместо диеза");
+    addTitle (Lang::secFlats (l));
     {
-        const int bw = juce::jmax (90, w / 5);
+        const int bw = juce::jmax (95, w / 5);
         int x = pad;
         for (auto* b : accidentalToggles)
         {
+            if (x + bw > pad + w) { x = pad; y += rowH + 4; }
             b->setBounds (x, y, bw, rowH);
             x += bw;
-            if (x + bw > pad + w) { x = pad; y += rowH + 4; }
         }
         y += rowH + gap;
     }
@@ -294,7 +422,7 @@ void SettingsPanel::resized()
 
     // ---- Тоника и лад ----
     st = sectionStart();
-    addTitle ("Тоника (можно выбрать только одну)");
+    addTitle (Lang::secTonic (l));
     {
         const int bw = juce::jmax (46, (w - 11 * 4) / 12);
         int x = pad;
@@ -306,12 +434,12 @@ void SettingsPanel::resized()
         }
         y += rowH + gap + 6;
     }
-    addTitle ("Лад (можно выбрать только один)");
+    addTitle (Lang::secMode (l));
     {
         int x = pad;
         for (auto* b : modeButtons)
         {
-            const int bw = juce::jmin (w, 130);
+            const int bw = juce::jmin (w, 140);
             if (x + bw > pad + w) { x = pad; y += rowH + 4; }
             b->setBounds (x, y, bw, rowH);
             x += bw + 4;
@@ -322,7 +450,7 @@ void SettingsPanel::resized()
 
     // ---- Номер обращения ----
     st = sectionStart();
-    addTitle ("Номер обращения");
+    addTitle (Lang::secInversion (l));
     showInversionToggle.setBounds (pad, y, w, rowH); y += rowH + gap;
     addSliderRow (invSizeLabel, invSizeSlider);
     addSliderRow (invXLabel,    invXSlider);
@@ -331,7 +459,7 @@ void SettingsPanel::resized()
 
     // ---- Ступень лада ----
     st = sectionStart();
-    addTitle ("Ступень лада");
+    addTitle (Lang::secDegree (l));
     showDegreeToggle.setBounds (pad, y, w, rowH); y += rowH + gap;
     addSliderRow (degSizeLabel, degSizeSlider);
     addSliderRow (degXLabel,    degXSlider);
@@ -340,17 +468,21 @@ void SettingsPanel::resized()
 
     // ---- Полиаккорд ----
     st = sectionStart();
-    addTitle ("Полиаккорд");
+    addTitle (Lang::secPoly (l));
     showPolyToggle.setBounds (pad, y, w, rowH); y += rowH + gap;
     addSliderRow (polyXLabel, polyXSlider);
     addSliderRow (polyYLabel, polyYSlider);
     closeSection (st);
 
+    // ---- Кнопка сброса, в самом низу ----
+    resetButton.setBounds (pad, y, w, rowH + 8);
+    y += rowH + 8;
+
     requiredHeight = y + pad;
 }
 
 //==============================================================================
-NotesToWebEditor::NotesToWebEditor (NotesToWebProcessor& p)
+ChordsDetectorEditor::ChordsDetectorEditor (ChordsDetectorProcessor& p)
     : AudioProcessorEditor (&p), processor (p), settingsPanel (p)
 {
     typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::PTSansBold_ttf,
@@ -361,42 +493,69 @@ NotesToWebEditor::NotesToWebEditor (NotesToWebProcessor& p)
     settingsViewport.setVisible (false);
     addAndMakeVisible (settingsViewport);
 
-    settingsPanel.onSettingsChanged = [this]
-    {
-        recalculate();
-        repaint();
-    };
+    // Полоса прокрутки в тон панели, а не стандартная синяя
+    auto& bar = settingsViewport.getVerticalScrollBar();
+    bar.setColour (juce::ScrollBar::thumbColourId,      colours::scrollThumb);
+    bar.setColour (juce::ScrollBar::trackColourId,      colours::buttonOff);
+    bar.setColour (juce::ScrollBar::backgroundColourId, colours::panel);
+
+    settingsPanel.onSettingsChanged = [this] { refreshEverything(); };
 
     settingsButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff262626));
     settingsButton.setColour (juce::TextButton::textColourOffId, colours::label);
     settingsButton.onClick = [this] { toggleSettings(); };
     addAndMakeVisible (settingsButton);
 
+    // Размер запоминаем ДО setResizeLimits: он подгоняет окно под свои границы
+    // и успевает перезаписать сохранённое значение
+    const int savedWidth  = juce::jlimit (400, 4000, processor.lastEditorWidth);
+    const int savedHeight = juce::jlimit (200, 3000, processor.lastEditorHeight);
+
     setResizable (true, true);
     setResizeLimits (400, 200, 4000, 3000);
-    setSize (processor.lastEditorWidth, processor.lastEditorHeight);
+    setSize (savedWidth, savedHeight);
+
+    // Панель настроек открывается в том же состоянии, в каком её оставили
+    settingsViewport.setVisible (processor.settings.showSettings);
+
+    ready = true;
+    resized();
 
     startTimerHz (30);
-    recalculate();
+    refreshEverything();
 }
 
-NotesToWebEditor::~NotesToWebEditor()
+ChordsDetectorEditor::~ChordsDetectorEditor()
 {
-    processor.lastEditorWidth  = getWidth();
-    processor.lastEditorHeight = getHeight();
+    if (ready)
+    {
+        processor.lastEditorWidth  = getWidth();
+        processor.lastEditorHeight = getHeight();
+    }
 }
 
-void NotesToWebEditor::toggleSettings()
+void ChordsDetectorEditor::refreshEverything()
+{
+    settingsButton.setButtonText (Lang::settings (processor.settings.language));
+    recalculate();
+    repaint();
+}
+
+void ChordsDetectorEditor::toggleSettings()
 {
     const bool show = ! settingsViewport.isVisible();
     settingsViewport.setVisible (show);
+    processor.settings.showSettings = show;
     if (show)
+    {
+        settingsPanel.updateTexts();
         settingsPanel.refreshFromSettings();
+    }
     resized();
     repaint();
 }
 
-void NotesToWebEditor::timerCallback()
+void ChordsDetectorEditor::timerCallback()
 {
     const int counter = processor.getUpdateCounter();
     if (counter != lastUpdateCounter)
@@ -407,7 +566,7 @@ void NotesToWebEditor::timerCallback()
     }
 }
 
-void NotesToWebEditor::recalculate()
+void ChordsDetectorEditor::recalculate()
 {
     const auto& s = processor.settings;
 
@@ -418,11 +577,20 @@ void NotesToWebEditor::recalculate()
     const auto notes = processor.getHeldNotes();
     const auto result = ChordEngine::detect (notes, naming, s.tonicPc, s.modeKey);
 
+    chordTextIsPlaceholder = false;
+
     if (notes.empty())
     {
-        chordText = processor.hasPlayedAnyNote()
-                        ? juce::String()
-                        : juce::String (juce::CharPointer_UTF8 ("\xd0\xbd\xd0\xb0\xd0\xb6\xd0\xbc\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xbd\xd0\xbe\xd1\x82\xd1\x83"));
+        if (processor.hasPlayedAnyNote())
+        {
+            chordText.clear();
+        }
+        else
+        {
+            chordText = Lang::pressANote (s.language);
+            chordTextIsPlaceholder = true;
+        }
+
         inversionText.clear();
         degreeText.clear();
         polyText.clear();
@@ -436,19 +604,24 @@ void NotesToWebEditor::recalculate()
     polyText      = s.showPoly      ? ChordEngine::polychordText (result, naming) : juce::String();
 }
 
-void NotesToWebEditor::paint (juce::Graphics& g)
+void ChordsDetectorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (colours::background);
-
-    if (chordText.isEmpty() && inversionText.isEmpty()
-        && degreeText.isEmpty() && polyText.isEmpty())
-        return;
-
     const auto& s = processor.settings;
+
+    g.fillAll (juce::Colour (s.backgroundColour));
+    g.setColour (juce::Colour (s.textColour));
+
     const float w = (float) getWidth();
     const float h = (float) getHeight();
 
-    g.setColour (colours::text);
+    // Подсказка рисуется системным шрифтом: во встроенном PT Sans нет,
+    // например, китайских иероглифов
+    if (chordTextIsPlaceholder)
+    {
+        g.setFont (juce::Font (juce::FontOptions (juce::jlimit (12.0f, 40.0f, h * 0.09f))));
+        g.drawText (chordText, getLocalBounds(), juce::Justification::centred, false);
+        return;
+    }
 
     // ---- Основная строка (аккорд) ----
     if (chordText.isNotEmpty())
@@ -459,7 +632,8 @@ void NotesToWebEditor::paint (juce::Graphics& g)
         {
             // подбираем размер так, чтобы текст занял почти всю ширину окна
             juce::Font probe (juce::FontOptions (typeface).withHeight (100.0f));
-            const float probeWidth = juce::jmax (1.0f, juce::GlyphArrangement::getStringWidth (probe, chordText));
+            const float probeWidth =
+                juce::jmax (1.0f, juce::GlyphArrangement::getStringWidth (probe, chordText));
             height = 100.0f * (w * 0.92f) / probeWidth;
             height = juce::jmin (height, h * 0.7f);
             height = (float) (height * s.chordSize / 100.0);
@@ -472,7 +646,8 @@ void NotesToWebEditor::paint (juce::Graphics& g)
     }
 
     // ---- Дополнительные строки ----
-    auto drawLine = [&] (const juce::String& text, double sizePercent, double xPercent, double yPercent)
+    auto drawLine = [&] (const juce::String& text, double sizePercent,
+                         double xPercent, double yPercent)
     {
         if (text.isEmpty())
             return;
@@ -491,19 +666,19 @@ void NotesToWebEditor::paint (juce::Graphics& g)
                     juce::Justification::centred, false);
     };
 
-    drawLine (inversionText, s.invSize,  s.invX,  s.invY);
-    drawLine (degreeText,    s.degSize,  s.degX,  s.degY);
+    drawLine (inversionText, s.invSize, s.invX, s.invY);
+    drawLine (degreeText,    s.degSize, s.degX, s.degY);
     // Полиаккорд масштабируется вместе с основной строкой — как в веб-версии
     drawLine (polyText,      s.chordSize, s.polyX, s.polyY);
 }
 
-void NotesToWebEditor::resized()
+void ChordsDetectorEditor::resized()
 {
-    settingsButton.setBounds (getWidth() - 106, 6, 100, 26);
+    settingsButton.setBounds (getWidth() - 126, 6, 120, 26);
 
     if (settingsViewport.isVisible())
     {
-        const int panelW = juce::jmin (getWidth() - 20, 560);
+        const int panelW = juce::jmin (getWidth() - 20, 580);
         settingsViewport.setBounds ((getWidth() - panelW) / 2, 40,
                                     panelW, juce::jmax (100, getHeight() - 60));
         settingsPanel.setSize (panelW - settingsViewport.getScrollBarThickness(), 100);
@@ -511,19 +686,22 @@ void NotesToWebEditor::resized()
         settingsPanel.setSize (settingsPanel.getWidth(), settingsPanel.getRequiredHeight());
     }
 
-    processor.lastEditorWidth  = getWidth();
-    processor.lastEditorHeight = getHeight();
+    if (ready)
+    {
+        processor.lastEditorWidth  = getWidth();
+        processor.lastEditorHeight = getHeight();
+    }
 }
 
-void NotesToWebEditor::mouseDown (const juce::MouseEvent& e)
+void ChordsDetectorEditor::mouseDown (const juce::MouseEvent& e)
 {
     // Средняя кнопка мыши открывает/закрывает настройки — как в веб-версии
     if (e.mods.isMiddleButtonDown())
         toggleSettings();
 }
 
-void NotesToWebEditor::mouseWheelMove (const juce::MouseEvent&,
-                                       const juce::MouseWheelDetails& wheel)
+void ChordsDetectorEditor::mouseWheelMove (const juce::MouseEvent&,
+                                           const juce::MouseWheelDetails& wheel)
 {
     if (wheel.deltaY > 0.02f && ! settingsViewport.isVisible())
         toggleSettings();
