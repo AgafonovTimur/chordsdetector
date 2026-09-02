@@ -113,5 +113,12 @@ private:
     // иначе ограничения размера успевают затереть сохранённое значение
     bool ready = false;
 
+    // Кнопка настроек прячется через 5 секунд после открытия окна
+    // и дальше показывается только при наведении мыши
+    static constexpr int buttonHideDelayMs = 5000;
+    juce::uint32 editorOpenedAtMs = 0;
+    bool buttonAutoHidden = false;
+    bool buttonShown = true;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChordsDetectorEditor)
 };

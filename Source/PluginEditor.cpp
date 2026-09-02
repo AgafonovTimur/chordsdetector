@@ -524,6 +524,8 @@ ChordsDetectorEditor::ChordsDetectorEditor (ChordsDetectorProcessor& p)
     ready = true;
     resized();
 
+    editorOpenedAtMs = juce::Time::getMillisecondCounter();
+
     startTimerHz (30);
     refreshEverything();
 }
@@ -560,6 +562,23 @@ void ChordsDetectorEditor::toggleSettings()
 
 void ChordsDetectorEditor::timerCallback()
 {
+    // ---- Показ/скрытие кнопки настроек ----
+    if (! buttonAutoHidden
+        && juce::Time::getMillisecondCounter() - editorOpenedAtMs > (juce::uint32) buttonHideDelayMs)
+    {
+        buttonAutoHidden = true;
+    }
+
+    // Кнопка остаётся на месте и продолжает ловить мышь даже будучи прозрачной,
+    // поэтому наведение на её угол снова её проявляет
+    const bool shouldShow = ! buttonAutoHidden || settingsButton.isMouseOver (true);
+
+    if (shouldShow != buttonShown)
+    {
+        buttonShown = shouldShow;
+        settingsButton.setAlpha (shouldShow ? 1.0f : 0.0f);
+    }
+
     const int counter = processor.getUpdateCounter();
     if (counter != lastUpdateCounter)
     {
