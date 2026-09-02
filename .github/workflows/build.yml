@@ -1,0 +1,26 @@
+name: Build VST3 (Windows)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Забрать исходники
+        uses: actions/checkout@v4
+
+      - name: Настроить проект
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Собрать
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Выложить готовый плагин
+        uses: actions/upload-artifact@v4
+        with:
+          name: NotesToWeb-VST3-Windows
+          path: build/NotesToWeb_artefacts/Release/VST3/
+          if-no-files-found: error
