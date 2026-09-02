@@ -12,6 +12,10 @@ jobs:
       - name: Забрать исходники
         uses: actions/checkout@v4
 
+      # Версия Visual Studio не указана намеренно: CMake сам находит ту,
+      # что установлена на машине сборки. GitHub периодически меняет её
+      # (в июне 2026 windows-latest перешёл с VS 2022 на VS 2026),
+      # и жёстко прописанная версия ломала бы сборку после каждой такой смены.
       - name: Настроить проект
         run: cmake -B build -A x64
 
@@ -21,6 +25,6 @@ jobs:
       - name: Выложить готовый плагин
         uses: actions/upload-artifact@v4
         with:
-          name: NotesToWeb-VST3-Windows
-          path: build/NotesToWeb_artefacts/Release/VST3/
+          name: ChordsDetector-VST3-Windows
+          path: build/ChordsDetector_artefacts/Release/VST3/
           if-no-files-found: error
