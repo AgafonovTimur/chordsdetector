@@ -33,8 +33,6 @@ private:
 
     juce::OwnedArray<juce::TextButton> languageButtons;
 
-    juce::ToggleButton midiThruToggle;
-
     juce::Label  captureLabel;
     juce::Slider captureSlider;
 

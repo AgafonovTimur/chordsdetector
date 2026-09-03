@@ -52,7 +52,6 @@ SettingsPanel::SettingsPanel (ChordsDetectorProcessor& p) : processor (p)
         addAndMakeVisible (b);
     };
 
-    styleToggle (midiThruToggle);
     styleToggle (fitToWindowToggle);
     styleToggle (showInversionToggle);
     styleToggle (showDegreeToggle);
@@ -204,7 +203,6 @@ void SettingsPanel::updateTexts()
     for (int i = 0; i < languageButtons.size(); ++i)
         languageButtons[i]->setButtonText (Lang::languageName (i));
 
-    midiThruToggle.setButtonText     (Lang::midiThru (l));
     fitToWindowToggle.setButtonText  (Lang::fitToWindow (l));
     showInversionToggle.setButtonText(Lang::showInversion (l));
     showDegreeToggle.setButtonText   (Lang::showDegree (l));
@@ -239,7 +237,6 @@ void SettingsPanel::changed()
 
     auto& s = processor.settings;
 
-    s.midiThru        = midiThruToggle.getToggleState();
     s.captureWindowMs = juce::roundToInt (captureSlider.getValue());
 
     for (int i = 0; i < accidentalToggles.size(); ++i)
@@ -271,7 +268,6 @@ void SettingsPanel::refreshFromSettings()
     updating = true;
     const auto& s = processor.settings;
 
-    midiThruToggle.setToggleState (s.midiThru, juce::dontSendNotification);
     captureSlider.setValue (s.captureWindowMs, juce::dontSendNotification);
 
     for (int i = 0; i < accidentalToggles.size(); ++i)
@@ -385,7 +381,6 @@ void SettingsPanel::resized()
     // ---- Общее ----
     st = sectionStart();
     addTitle (Lang::secGeneral (l));
-    midiThruToggle.setBounds (pad, y, w, rowH); y += rowH + gap;
     addSliderRow (captureLabel, captureSlider);
     closeSection (st);
 

@@ -6,7 +6,7 @@ namespace ids
 {
     #define ID(name) static const juce::Identifier name (#name);
     ID (ChordsDetectorState)
-    ID (language) ID (midiThru) ID (captureWindowMs) ID (showSettings)
+    ID (language) ID (captureWindowMs) ID (showSettings)
     ID (backgroundColour) ID (textColour)
     ID (useFlat) ID (tonicPc) ID (modeKey)
     ID (chordSize) ID (fitToWindow)
@@ -21,7 +21,6 @@ juce::ValueTree Settings::toValueTree() const
     juce::ValueTree v (ids::ChordsDetectorState);
 
     v.setProperty (ids::language,        language,        nullptr);
-    v.setProperty (ids::midiThru,        midiThru,        nullptr);
     v.setProperty (ids::showSettings,    showSettings,    nullptr);
     v.setProperty (ids::backgroundColour, (int) backgroundColour, nullptr);
     v.setProperty (ids::textColour,       (int) textColour,       nullptr);
@@ -61,7 +60,6 @@ void Settings::fromValueTree (const juce::ValueTree& v)
         return;
 
     language        = v.getProperty (ids::language,        language);
-    midiThru        = v.getProperty (ids::midiThru,        midiThru);
     showSettings    = v.getProperty (ids::showSettings,    showSettings);
     backgroundColour = (juce::uint32) (int) v.getProperty (ids::backgroundColour, (int) backgroundColour);
     textColour       = (juce::uint32) (int) v.getProperty (ids::textColour,       (int) textColour);
@@ -169,8 +167,7 @@ void ChordsDetectorProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             commitCapturedNotes();
     }
 
-    if (! settings.midiThru)
-        midiMessages.clear();
+    // MIDI всегда уходит дальше по цепочке — без него инструмент после плагина молчал бы
 }
 
 std::vector<int> ChordsDetectorProcessor::getHeldNotes() const

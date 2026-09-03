@@ -54,7 +54,6 @@ namespace Lang
     inline juce::String secDegree (int l)     { return tr (l, "СТУПЕНЬ ЛАДА", "SCALE DEGREE", "音级"); }
     inline juce::String secPoly (int l)       { return tr (l, "ПОЛИАККОРД", "POLYCHORD", "复合和弦"); }
 
-    inline juce::String midiThru (int l)      { return tr (l, "Пропускать MIDI дальше (MIDI Thru)", "Pass MIDI through (MIDI Thru)", "转发 MIDI（MIDI Thru）"); }
     inline juce::String captureWindow (int l) { return tr (l, "Окно захвата аккорда, мс", "Chord capture window, ms", "和弦采集窗口（毫秒）"); }
     inline juce::String fitToWindow (int l)   { return tr (l, "Подгонять аккорд под ширину окна", "Fit chord to window width", "和弦自适应窗口宽度"); }
     inline juce::String chordSize (int l)     { return tr (l, "Размер аккорда, %", "Chord size, %", "和弦大小 %"); }

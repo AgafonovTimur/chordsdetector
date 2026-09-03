@@ -11,7 +11,6 @@
 struct Settings
 {
     int  language        = 0;      // 0 - русский, 1 - английский, 2 - китайский
-    bool midiThru        = true;   // пропускать MIDI дальше по цепочке
     int  captureWindowMs = 50;     // окно захвата аккорда
     bool showSettings    = false;  // была ли открыта панель настроек
 
